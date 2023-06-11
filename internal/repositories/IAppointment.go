@@ -1,10 +1,11 @@
 package repositories
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 	"psi-system.be.go.fiber/internal/domain/enums"
 	"psi-system.be.go.fiber/internal/domain/model/appointment"
-	"time"
 )
 
 type AppointmentRepository interface {
@@ -17,6 +18,7 @@ type AppointmentRepository interface {
 	GetByTimeRange(start, end time.Time) ([]*appointment.Appointment, error)
 	CheckDateByTimeRange(start, end time.Time) ([]*appointment.Appointment, error)
 	UpdateStatusAppointment(ID uint, status enums.StatusAgendamento) error
+	GetByYear(year int) ([]*appointment.Appointment, error)
 }
 
 type appointmentRepository struct {
@@ -25,6 +27,14 @@ type appointmentRepository struct {
 
 func NewAppointmentRepository(db *gorm.DB) AppointmentRepository {
 	return &appointmentRepository{db: db}
+}
+
+func (r *appointmentRepository) GetByYear(year int) ([]*appointment.Appointment, error) {
+	var appointments []*appointment.Appointment
+	startOfYear := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	endOfYear := time.Date(year, 12, 31, 23, 59, 59, 999999999, time.UTC)
+	err := r.db.Where("\"start\" >= ? AND \"end\" <= ?", startOfYear, endOfYear).Find(&appointments).Error
+	return appointments, err
 }
 
 func (r *appointmentRepository) Create(appointment *appointment.Appointment) error {

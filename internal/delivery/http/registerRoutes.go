@@ -12,6 +12,7 @@ func RegisterRoutes(app *fiber.App) {
 	api := app.Group("/schedule/v1")
 	handler := provide()
 	api.Post("/create-appointment", handler.CreateAppointment)
+	api.Get("/list-appointments", handler.GetAppointmentsByYear)
 }
 
 func provide() *handlers.AppointmentHandler {

@@ -12,6 +12,7 @@ var Logger = logrus.New()
 
 type AppointmentService interface {
 	Save(request *appointment.Appointment) error
+	GetByYear(year int) ([]*appointment.Appointment, error)
 }
 
 func NewAppointmentService(repo repositories.AppointmentRepository) AppointmentService {
@@ -126,4 +127,20 @@ func (s *appointmentService) UpdateStatusAppointment(ID uint, status enums.Statu
 	}).Info("Appointment status updated successfully")
 
 	return nil
+}
+
+func (s *appointmentService) GetByYear(year int) ([]*appointment.Appointment, error) {
+	appointments, err := s.repo.GetByYear(year)
+	if err != nil {
+		Logger.WithFields(logrus.Fields{
+			"action": "GetByYear",
+		}).Error("Database error: ", err)
+		return nil, err
+	}
+
+	Logger.WithFields(logrus.Fields{
+		"action": "GetByYear",
+	}).Info("Appointments of the year retrieved successfully")
+
+	return appointments, nil
 }
