@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"strconv"
 	"time"
 
 	"gorm.io/gorm"
@@ -16,7 +17,9 @@ type AppointmentRepository interface {
 	GetByID(ID uint) (*appointment.Appointment, error)
 	GetByStart(start time.Time) (*appointment.Appointment, error)
 	GetByTimeRange(start, end time.Time) ([]*appointment.Appointment, error)
+	GetByTimeRangeNotId(id uint, start, end time.Time) ([]*appointment.Appointment, error)
 	CheckDateByTimeRange(start, end time.Time) ([]*appointment.Appointment, error)
+	CheckDateByTimeRangeUpdate(start, end time.Time) ([]*appointment.Appointment, error)
 	UpdateStatusAppointment(ID uint, status enums.StatusAgendamento) error
 	GetByYear(year int) ([]*appointment.Appointment, error)
 }
@@ -33,7 +36,10 @@ func (r *appointmentRepository) GetByYear(year int) ([]*appointment.Appointment,
 	var appointments []*appointment.Appointment
 	startOfYear := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
 	endOfYear := time.Date(year, 12, 31, 23, 59, 59, 999999999, time.UTC)
-	err := r.db.Where("\"start\" >= ? AND \"end\" <= ?", startOfYear, endOfYear).Find(&appointments).Error
+
+	canceladoStatus := strconv.Itoa(int(enums.Cancelado))
+
+	err := r.db.Where("\"start\" >= ? AND \"start\" <= ? AND \"status\" != ?", startOfYear, endOfYear, canceladoStatus).Find(&appointments).Error
 	return appointments, err
 }
 
@@ -75,14 +81,28 @@ func (r *appointmentRepository) GetByStart(start time.Time) (*appointment.Appoin
 	return &appointment, err
 }
 
+func (r *appointmentRepository) GetByTimeRange(start, end time.Time) ([]*appointment.Appointment, error) {
+	var appointments []*appointment.Appointment
+	canceladoStatus := strconv.Itoa(int(enums.Cancelado))
+	err := r.db.Not("status = ?", canceladoStatus).Where("\"start\" >= ? AND \"end\" < ?", start, end).Find(&appointments).Error
+	return appointments, err
+}
+
+func (r *appointmentRepository) GetByTimeRangeNotId(ID uint, start, end time.Time) ([]*appointment.Appointment, error) {
+	var appointments []*appointment.Appointment
+	canceladoStatus := int(enums.Cancelado)
+	err := r.db.Not("id = ?", ID).Not("status = ?", canceladoStatus).Where("\"start\" >= ? AND \"end\" < ?", start, end).Find(&appointments).Error
+	return appointments, err
+}
+
 func (r *appointmentRepository) CheckDateByTimeRange(start, end time.Time) ([]*appointment.Appointment, error) {
 	var appointments []*appointment.Appointment
 	err := r.db.Where("\"start\" < ? AND \"end\" > ?", end, start).Find(&appointments).Error
 	return appointments, err
 }
 
-func (r *appointmentRepository) GetByTimeRange(start, end time.Time) ([]*appointment.Appointment, error) {
+func (r *appointmentRepository) CheckDateByTimeRangeUpdate(start, end time.Time) ([]*appointment.Appointment, error) {
 	var appointments []*appointment.Appointment
-	err := r.db.Where("\"start\" >= ? AND \"end\" <= ?", start, end).Find(&appointments).Error
+	err := r.db.Where("\"start\" < ? AND \"end\" > ?", end, start).Find(&appointments).Error
 	return appointments, err
 }

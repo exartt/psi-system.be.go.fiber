@@ -1,11 +1,14 @@
 package appointment
 
-import "time"
+import (
+	"psi-system.be.go.fiber/internal/domain/enums"
+	"time"
+)
 
 type Appointment struct {
 	ID             uint `gorm:"primary_key"`
-	PsychologistID uint // Add this
-	PatientID      uint // Add this
+	PsychologistID uint
+	PatientID      uint
 	TenantID       uint `gorm:"not null"`
 	CalendarID     string
 	Start          time.Time
@@ -13,7 +16,7 @@ type Appointment struct {
 	Summary        string
 	Description    string
 	Location       string
-	Status         string
+	Status         enums.StatusAgendamento
 	Notify         bool
 	CreatedAt      time.Time
 	UpdatedAt      time.Time

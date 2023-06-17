@@ -13,6 +13,9 @@ var Logger = logrus.New()
 type AppointmentService interface {
 	Save(request *appointment.Appointment) error
 	GetByYear(year int) ([]*appointment.Appointment, error)
+	UpdateStatusAppointment(id uint, status enums.StatusAgendamento) error
+	Update(id uint, appointment *appointment.Appointment) error
+	GetByID(id uint) (*appointment.Appointment, error)
 }
 
 func NewAppointmentService(repo repositories.AppointmentRepository) AppointmentService {
@@ -44,7 +47,25 @@ func (s *appointmentService) Save(request *appointment.Appointment) error {
 }
 
 func (s *appointmentService) checkConflict(appointment *appointment.Appointment) error {
-	existingAppointments, err := s.repo.CheckDateByTimeRange(appointment.Start, appointment.End)
+	existingAppointments, err := s.repo.GetByTimeRange(appointment.Start, appointment.End)
+	if err != nil {
+		Logger.WithFields(logrus.Fields{
+			"action": "checkConflict",
+		}).Error("Error retrieving appointments: ", err)
+		return err
+	}
+	if len(existingAppointments) > 0 {
+		Logger.WithFields(logrus.Fields{
+			"action": "checkConflict",
+		}).Error("Appointment conflict detected")
+		return errors.New("appointment conflict detected")
+	}
+
+	return nil
+}
+
+func (s *appointmentService) checkConflictUpdate(appointment *appointment.Appointment) error {
+	existingAppointments, err := s.repo.GetByTimeRangeNotId(appointment.ID, appointment.Start, appointment.End)
 	if err != nil {
 		Logger.WithFields(logrus.Fields{
 			"action": "checkConflict",
@@ -62,7 +83,7 @@ func (s *appointmentService) checkConflict(appointment *appointment.Appointment)
 }
 
 func (s *appointmentService) Update(id uint, request *appointment.Appointment) error {
-	if err := s.checkConflict(request); err != nil {
+	if err := s.checkConflictUpdate(request); err != nil {
 		return err
 	}
 
@@ -143,4 +164,23 @@ func (s *appointmentService) GetByYear(year int) ([]*appointment.Appointment, er
 	}).Info("Appointments of the year retrieved successfully")
 
 	return appointments, nil
+}
+
+func (s *appointmentService) GetByID(ID uint) (*appointment.Appointment, error) {
+	appointment, err := s.repo.GetByID(ID)
+	if err != nil {
+		Logger.WithFields(logrus.Fields{
+			"action": "GetByID",
+		}).Error("Error fetching appointment by ID: ", err)
+		return nil, err
+	}
+
+	if appointment == nil {
+		Logger.WithFields(logrus.Fields{
+			"action": "GetByID",
+		}).Error("Appointment not found")
+		return nil, errors.New("appointment not found")
+	}
+
+	return appointment, nil
 }

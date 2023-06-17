@@ -1,9 +1,11 @@
 package main
 
 import (
+	"log"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"log"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 	"psi-system.be.go.fiber/internal/delivery/http"
 	"psi-system.be.go.fiber/internal/infrastructure"
 	"psi-system.be.go.fiber/internal/infrastructure/database"
@@ -16,9 +18,9 @@ func main() {
 	database.Migrate()
 
 	app := fiber.New()
-	app.Use(cors.New(cors.Config{
-		AllowCredentials: true,
-	}))
+	app.Use(recover.New())
+	app.Use(cors.New())
+
 	http.RegisterRoutes(app)
 	log.Fatal(app.Listen(":3030"))
 }
