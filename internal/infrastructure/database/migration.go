@@ -34,15 +34,5 @@ func Migrate() error {
 		return fmt.Errorf("failed to auto migrate CashFlow model: %v", err)
 	}
 
-	err = infrastructure.DB.AutoMigrate(&cashflow.BillToPay{})
-	if err != nil {
-		return fmt.Errorf("failed to auto migrate BillToPay model: %v", err)
-	}
-
-	err = infrastructure.DB.AutoMigrate(&cashflow.BillToReceive{})
-	if err != nil {
-		return fmt.Errorf("failed to auto migrate BillToReceive model: %v", err)
-	}
-
 	return nil
 }

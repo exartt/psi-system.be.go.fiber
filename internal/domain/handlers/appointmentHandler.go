@@ -1,13 +1,18 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
 	"net/http"
+	"os"
 	"psi-system.be.go.fiber/internal/domain/enums"
 	"psi-system.be.go.fiber/internal/domain/model/appointment"
 	"psi-system.be.go.fiber/internal/domain/services"
 	"strconv"
+	"time"
 )
 
 type AppointmentHandler struct {
@@ -23,11 +28,21 @@ func NewAppointmentHandler(service services.AppointmentService) *AppointmentHand
 
 func (h *AppointmentHandler) CreateAppointment(c *fiber.Ctx) error {
 	var appointment appointment.Appointment
+
 	if err := c.BodyParser(&appointment); err != nil {
 		h.Logger.WithFields(logrus.Fields{
 			"action": "CreateAppointment",
 		}).Error("Failed to read body: ", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to read body"})
+	}
+
+	appointment.CalendarID = os.Getenv("CALENDAR_ID")
+
+	if err := createGoogleCalendarEvent(&appointment, h.Logger); err != nil {
+		h.Logger.WithFields(logrus.Fields{
+			"action": "CreateAppointmentGoogleCalendar",
+		}).Error("Failed to create the google calendar event: ", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	if err := h.Service.Save(&appointment); err != nil {
@@ -164,4 +179,38 @@ func (h *AppointmentHandler) respondError(c *fiber.Ctx, action, message string, 
 		"action": action,
 	}).Error(message+": ", err)
 	return c.Status(statusCode).JSON(fiber.Map{"error": message})
+}
+
+func createGoogleCalendarEvent(appointment *appointment.Appointment, logger *logrus.Logger) error {
+	calendarEvent := map[string]interface{}{
+		"summary":     "Consulta",
+		"description": appointment.Description,
+		"location":    "Clínica",
+		"start": map[string]string{
+			"dateTime": appointment.Start.Format(time.RFC3339),
+			"timeZone": "America/Sao_Paulo", // Brasil (GMT-3)
+		},
+		"end": map[string]string{
+			"dateTime": appointment.End.Format(time.RFC3339),
+			"timeZone": "America/Sao_Paulo", // Brasil (GMT-3)
+		},
+	}
+
+	jsonData, err := json.Marshal(calendarEvent)
+	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"action": "createGoogleCalendarEvent",
+		}).Error("Failed to marshal JSON: ", err)
+		return fmt.Errorf("Failed to marshal JSON")
+	}
+
+	resp, err := http.Post(enums.CREATE.String(""), "application/json", bytes.NewBuffer(jsonData))
+	if err != nil || resp.StatusCode != http.StatusOK {
+		logger.WithFields(logrus.Fields{
+			"action": "createGoogleCalendarEvent",
+		}).Error("Failed to create calendar event: ", err)
+		return fmt.Errorf("Failed to create calendar event")
+	}
+
+	return nil
 }
