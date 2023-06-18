@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	"net/http"
-	"os"
 	"psi-system.be.go.fiber/internal/domain/enums"
 	"psi-system.be.go.fiber/internal/domain/model/appointment"
 	"psi-system.be.go.fiber/internal/domain/services"
@@ -27,23 +27,26 @@ func NewAppointmentHandler(service services.AppointmentService) *AppointmentHand
 }
 
 func (h *AppointmentHandler) CreateAppointment(c *fiber.Ctx) error {
-	var appointment appointment.Appointment
+	var appointmentDTO appointment.AppointmentDTO
 
-	if err := c.BodyParser(&appointment); err != nil {
+	if err := c.BodyParser(&appointmentDTO); err != nil {
 		h.Logger.WithFields(logrus.Fields{
 			"action": "CreateAppointment",
 		}).Error("Failed to read body: ", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to read body"})
 	}
 
-	appointment.CalendarID = os.Getenv("CALENDAR_ID")
+	appointment := convertDTOToEntity(appointmentDTO)
 
-	if err := createGoogleCalendarEvent(&appointment, h.Logger); err != nil {
+	eventID, err := createGoogleCalendarEvent(&appointment, h.Logger)
+	if err != nil {
 		h.Logger.WithFields(logrus.Fields{
 			"action": "CreateAppointmentGoogleCalendar",
 		}).Error("Failed to create the google calendar event: ", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	appointment.EventID = eventID
 
 	if err := h.Service.Save(&appointment); err != nil {
 		h.Logger.WithFields(logrus.Fields{
@@ -95,6 +98,9 @@ func (h *AppointmentHandler) UpdateAppointment(c *fiber.Ctx) error {
 	}
 
 	if h.applyUpdates(currentAppointment, updates) {
+		if err := updateGoogleCalendarEvent(updates, updates.EventID, h.Logger); err != nil {
+			return h.respondError(c, "UpdateAppointment", "Error updating Google Calendar event", fiber.StatusInternalServerError, err)
+		}
 		if err := h.Service.Update(uint(id), currentAppointment); err != nil {
 			return h.respondError(c, "UpdateAppointment", "Error updating appointment", fiber.StatusInternalServerError, err)
 		}
@@ -115,22 +121,24 @@ func (h *AppointmentHandler) CancelAppointment(c *fiber.Ctx) error {
 		return h.respondError(c, "CancelAppointment", "Error fetching appointment", fiber.StatusInternalServerError, err)
 	}
 
-	// Definir o status como "Cancelado"
+	if err := deleteGoogleCalendarEvent(currentAppointment.EventID, h.Logger); err != nil {
+		return h.respondError(c, "CancelAppointment", "Error canceling Google Calendar event", fiber.StatusInternalServerError, err)
+	}
+
 	currentAppointment.Status = enums.Cancelado
 
-	// Atualizar o compromisso no banco de dados
 	if err := h.Service.Update(uint(id), currentAppointment); err != nil {
 		return h.respondError(c, "CancelAppointment", "Error updating appointment", fiber.StatusInternalServerError, err)
 	}
 
-	// Enviar resposta bem-sucedida
 	return c.Status(http.StatusOK).JSON(fiber.Map{"message": "Appointment canceled successfully"})
 }
 
 func (h *AppointmentHandler) parseUpdateData(c *fiber.Ctx) (*appointment.Appointment, error) {
-	var updates appointment.Appointment
+	var updates appointment.AppointmentDTO
 	err := c.BodyParser(&updates)
-	return &updates, err
+	appointment := convertDTOToEntity(updates)
+	return &appointment, err
 }
 
 func (h *AppointmentHandler) applyUpdates(appointment *appointment.Appointment, updates *appointment.Appointment) bool {
@@ -181,18 +189,42 @@ func (h *AppointmentHandler) respondError(c *fiber.Ctx, action, message string, 
 	return c.Status(statusCode).JSON(fiber.Map{"error": message})
 }
 
-func createGoogleCalendarEvent(appointment *appointment.Appointment, logger *logrus.Logger) error {
+func deleteGoogleCalendarEvent(eventID string, logger *logrus.Logger) error {
+	client := &http.Client{}
+
+	deleteEventURL := enums.DELETE.String(eventID)
+
+	req, err := http.NewRequest(http.MethodDelete, deleteEventURL, nil)
+	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"action": "deleteGoogleCalendarEvent",
+		}).Error("Failed to create request: ", err)
+		return fmt.Errorf("Failed to create request")
+	}
+
+	resp, err := client.Do(req)
+	if err != nil || (resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent) {
+		logger.WithFields(logrus.Fields{
+			"action": "deleteGoogleCalendarEvent",
+		}).Error("Failed to delete calendar event: ", err)
+		return fmt.Errorf("Failed to delete calendar event")
+	}
+
+	return nil
+}
+
+func createGoogleCalendarEvent(appointment *appointment.Appointment, logger *logrus.Logger) (string, error) {
 	calendarEvent := map[string]interface{}{
-		"summary":     "Consulta",
+		"summary":     appointment.Summary,
 		"description": appointment.Description,
 		"location":    "Clínica",
 		"start": map[string]string{
 			"dateTime": appointment.Start.Format(time.RFC3339),
-			"timeZone": "America/Sao_Paulo", // Brasil (GMT-3)
+			"timeZone": "America/Sao_Paulo",
 		},
 		"end": map[string]string{
 			"dateTime": appointment.End.Format(time.RFC3339),
-			"timeZone": "America/Sao_Paulo", // Brasil (GMT-3)
+			"timeZone": "America/Sao_Paulo",
 		},
 	}
 
@@ -201,7 +233,7 @@ func createGoogleCalendarEvent(appointment *appointment.Appointment, logger *log
 		logger.WithFields(logrus.Fields{
 			"action": "createGoogleCalendarEvent",
 		}).Error("Failed to marshal JSON: ", err)
-		return fmt.Errorf("Failed to marshal JSON")
+		return "", fmt.Errorf("Failed to marshal JSON")
 	}
 
 	resp, err := http.Post(enums.CREATE.String(""), "application/json", bytes.NewBuffer(jsonData))
@@ -209,8 +241,86 @@ func createGoogleCalendarEvent(appointment *appointment.Appointment, logger *log
 		logger.WithFields(logrus.Fields{
 			"action": "createGoogleCalendarEvent",
 		}).Error("Failed to create calendar event: ", err)
-		return fmt.Errorf("Failed to create calendar event")
+		return "", fmt.Errorf("Failed to create calendar event")
+	}
+
+	defer resp.Body.Close()
+	responseBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("Failed to read response body")
+	}
+
+	var responseMap map[string]interface{}
+	err = json.Unmarshal(responseBody, &responseMap)
+	if err != nil {
+		return "", fmt.Errorf("Failed to parse response body")
+	}
+
+	eventID, ok := responseMap["eventID"].(string)
+	if !ok {
+		return "", fmt.Errorf("Failed to extract event ID")
+	}
+
+	return eventID, nil
+}
+
+func updateGoogleCalendarEvent(appointment *appointment.Appointment, eventID string, logger *logrus.Logger) error {
+	calendarEvent := map[string]interface{}{
+		"summary":     appointment.Summary,
+		"description": appointment.Description,
+		"location":    "Clínica",
+		"start": map[string]string{
+			"dateTime": appointment.Start.Format(time.RFC3339),
+			"timeZone": "America/Sao_Paulo",
+		},
+		"end": map[string]string{
+			"dateTime": appointment.End.Format(time.RFC3339),
+			"timeZone": "America/Sao_Paulo",
+		},
+	}
+
+	jsonData, err := json.Marshal(calendarEvent)
+	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"action": "updateGoogleCalendarEvent",
+		}).Error("Failed to marshal JSON: ", err)
+		return fmt.Errorf("Failed to marshal JSON")
+	}
+
+	client := &http.Client{}
+
+	updateEventURL := enums.UPDATE.String(eventID)
+	print(updateEventURL)
+	req, err := http.NewRequest(http.MethodPut, updateEventURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"action": "updateGoogleCalendarEvent",
+		}).Error("Failed to create request: ", err)
+		return fmt.Errorf("Failed to create request")
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		logger.WithFields(logrus.Fields{
+			"action": "updateGoogleCalendarEvent",
+		}).Error("Failed to update calendar event: ", err)
+		return fmt.Errorf("Failed to update calendar event")
 	}
 
 	return nil
+}
+
+func convertDTOToEntity(dto appointment.AppointmentDTO) appointment.Appointment {
+	return appointment.Appointment{
+		ID:             dto.ID,
+		PsychologistID: dto.PsychologistID,
+		PatientID:      dto.PatientID,
+		Start:          dto.Start,
+		End:            dto.End,
+		Summary:        dto.Summary,
+		Description:    dto.Description,
+		Status:         dto.Status,
+		EventID:        dto.EventID,
+	}
 }

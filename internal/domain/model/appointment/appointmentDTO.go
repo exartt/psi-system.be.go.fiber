@@ -5,19 +5,14 @@ import (
 	"time"
 )
 
-type Appointment struct {
-	ID             uint `gorm:"primary_key"`
+type AppointmentDTO struct {
+	ID             uint
 	PsychologistID uint
 	PatientID      uint
-	TenantID       uint `gorm:"not null"`
 	EventID        string
 	Start          time.Time
 	End            time.Time
 	Summary        string
 	Description    string
-	Location       string
 	Status         enums.StatusAgendamento
-	Notify         bool
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
 }
