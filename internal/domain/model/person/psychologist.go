@@ -8,5 +8,5 @@ type Psychologist struct {
 	Access       int
 	TenantID     uint                      `gorm:"not null"`
 	Password     string                    `gorm:"not null"`
-	Appointments []appointment.Appointment `gorm:"ForeignKey:PsychologistID"`
+	Appointments []appointment.Appointment `gorm:"foreignKey:PsychologistID"`
 }

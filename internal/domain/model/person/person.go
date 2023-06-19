@@ -16,6 +16,6 @@ type Person struct {
 	RegistrationDate time.Time
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
-	Psychologist     Psychologist
-	Patient          Patient
+	Psychologist     *Psychologist
+	Patient          *Patient
 }

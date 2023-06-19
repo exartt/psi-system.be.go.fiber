@@ -227,7 +227,7 @@ func createGoogleCalendarEvent(appointment *appointment.Appointment, logger *log
 			"timeZone": "America/Sao_Paulo",
 		},
 	}
-
+	fmt.Printf("%+v\n", calendarEvent)
 	jsonData, err := json.Marshal(calendarEvent)
 	if err != nil {
 		logger.WithFields(logrus.Fields{

@@ -23,6 +23,15 @@ func RegisterRoutes(app *fiber.App) {
 	googleConsumerHandler := provideGoogleConsumer()
 	calendar.Get("/google-authenticate", googleConsumerHandler.RequestGoogleAuth)
 
+	patient := app.Group("/patient/v1")
+	patientHandler := providePatient()
+	patient.Get("/list-patients", patientHandler.GetPatientsOptions)
+}
+
+func providePatient() *handlers.PatientHandler {
+	patientRepo := repositories.NewPatientRepository(infrastructure.DB)
+	patientService := services.NewPatientService(patientRepo)
+	return handlers.NewPatientHandler(patientService)
 }
 
 func provideGoogleConsumer() *handlers.GoogleConsumerHandler {
