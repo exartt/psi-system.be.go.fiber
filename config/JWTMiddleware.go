@@ -12,14 +12,19 @@ import (
 
 func JWTMiddleware() func(*fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		authorization := c.Cookies("Authorization")
+		authorization := c.Get("Authorization") // Obtenha o cabeçalho "Authorization"
+
+		// Verifique se o cabeçalho está vazio
 		if authorization == "" {
 			return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Unauthorized",
 			})
 		}
 
+		// Extraia o token da string "Bearer"
 		tokenString := strings.Replace(authorization, "Bearer ", "", 1)
+
+		// Parse e valide o token
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, errors.New("unexpected signing method")
@@ -33,19 +38,16 @@ func JWTMiddleware() func(*fiber.Ctx) error {
 			})
 		}
 
+		// Verifique se o token é válido e se expirou
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 			if float64(time.Now().Unix()) > claims["exp"].(float64) {
 				return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
-					"error": "expired token",
+					"error": "Expired token",
 				})
 			}
-			c.Locals("userID", claims["sub"])
 
-			c.Cookie(&fiber.Cookie{
-				Name:     "Authorization",
-				Value:    tokenString,
-				HTTPOnly: true,
-			})
+			// Defina o ID do usuário como uma variável local na solicitação
+			c.Locals("userID", claims["sub"])
 		}
 		return c.Next()
 	}

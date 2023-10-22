@@ -1,12 +1,11 @@
 package main
 
 import (
-	"log"
-	"psi-system.be.go.fiber/config"
-
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"log"
+	"psi-system.be.go.fiber/config"
 	"psi-system.be.go.fiber/internal/delivery/http"
 	"psi-system.be.go.fiber/internal/infrastructure"
 	"psi-system.be.go.fiber/internal/infrastructure/database"
