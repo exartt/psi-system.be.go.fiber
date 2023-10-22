@@ -13,7 +13,7 @@ const (
 )
 
 func (s calendarConsumer) String(id string) string {
-	endpoint := "http://localhost:3021/calendar/v1"
+	endpoint := "http://localhost:3021/calendar/v1" // todo -> remover daqui, substituir pelo .env
 	switch s {
 	case CREATE:
 		return endpoint + "/events"

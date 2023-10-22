@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"psi-system.be.go.fiber/config"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -20,6 +21,8 @@ func main() {
 	app := fiber.New()
 	app.Use(recover.New())
 	app.Use(cors.New())
+
+	app.Use(config.JWTMiddleware())
 
 	http.RegisterRoutes(app)
 	log.Fatal(app.Listen(":3030"))

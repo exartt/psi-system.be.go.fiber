@@ -27,7 +27,7 @@ func NewAppointmentHandler(service services.AppointmentService) *AppointmentHand
 }
 
 func (h *AppointmentHandler) CreateAppointment(c *fiber.Ctx) error {
-	var appointmentDTO appointment.AppointmentDTO
+	var appointmentDTO appointment.DTO
 
 	if err := c.BodyParser(&appointmentDTO); err != nil {
 		h.Logger.WithFields(logrus.Fields{
@@ -135,7 +135,7 @@ func (h *AppointmentHandler) CancelAppointment(c *fiber.Ctx) error {
 }
 
 func (h *AppointmentHandler) parseUpdateData(c *fiber.Ctx) (*appointment.Appointment, error) {
-	var updates appointment.AppointmentDTO
+	var updates appointment.DTO
 	err := c.BodyParser(&updates)
 	appointment := convertDTOToEntity(updates)
 	return &appointment, err
@@ -311,7 +311,7 @@ func updateGoogleCalendarEvent(appointment *appointment.Appointment, eventID str
 	return nil
 }
 
-func convertDTOToEntity(dto appointment.AppointmentDTO) appointment.Appointment {
+func convertDTOToEntity(dto appointment.DTO) appointment.Appointment {
 	return appointment.Appointment{
 		ID:             dto.ID,
 		PsychologistID: dto.PsychologistID,

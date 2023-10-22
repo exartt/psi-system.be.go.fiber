@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type AppointmentDTO struct {
+type DTO struct {
 	ID             uint
 	PsychologistID uint
 	PatientID      uint

@@ -12,6 +12,8 @@ func RegisterRoutes(app *fiber.App) {
 	schedule := app.Group("/schedule/v1")
 	appointmentHandler := provideAppointment()
 	billToReceiveHandler := provideBillToReceive()
+	personRepo := repositories.NewPersonRepository(infrastructure.DB)
+
 	schedule.Post("/create-appointment", appointmentHandler.CreateAppointment)
 	schedule.Get("/list-appointments", appointmentHandler.GetAppointmentsByYear)
 	schedule.Put("/update-appointment/:id/status/:status", appointmentHandler.UpdateAppointment)
@@ -22,13 +24,24 @@ func RegisterRoutes(app *fiber.App) {
 	calendar := app.Group("/calendar/v1")
 	googleConsumerHandler := provideGoogleConsumer()
 	calendar.Get("/google-authenticate", googleConsumerHandler.RequestGoogleAuth)
+	calendar.Post("/google-authenticate/callback", googleConsumerHandler.HandleGoogleCallback)
 
 	patient := app.Group("/patient/v1")
-	patientHandler := providePatient()
+	patientHandler := providePatient(personRepo)
 	patient.Get("/list-patients", patientHandler.GetPatientsOptions)
+
+	psychologist := app.Group("/psychologist/v1")
+	psychologistHandler := providePsychologist(personRepo)
+	psychologist.Post("/create-psychologist", psychologistHandler.CreatePsychologist)
 }
 
-func providePatient() *handlers.PatientHandler {
+func providePsychologist(personRepo repositories.IPersonRepository) *handlers.PsychologistHandler {
+	psychologistRepo := repositories.NewPsychologistRepository(infrastructure.DB)
+	psychologistService := services.NewPsychologistService(personRepo, psychologistRepo)
+	return handlers.NewPsychologistHandler(psychologistService)
+}
+
+func providePatient(personRepo repositories.IPersonRepository) *handlers.PatientHandler {
 	patientRepo := repositories.NewPatientRepository(infrastructure.DB)
 	patientService := services.NewPatientService(patientRepo)
 	return handlers.NewPatientHandler(patientService)
