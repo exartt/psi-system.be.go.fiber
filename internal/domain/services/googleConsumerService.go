@@ -17,10 +17,11 @@ type GoogleConsumerService interface {
 	RequestGoogleAuth() (string, error)
 	RequestGoogleAuthAuthorized() (string, error)
 	Store(token string, expirationDateTime time.Time, psyID uint) error
-	FindByPsyID(psyID uint, expirationDateTime time.Time) (*googleCalendar.TokenDTO, error)
+	FindByPsyID(psyID uint) (*googleCalendar.TokenDTO, error)
 	Update(token string, psyID uint) error
 	Delete(psyID uint, tenantID uint) error
 	ExchangeCodeAndStoreToken(code string, psychologistID uint) (*googleCalendar.TokenDTO, error)
+	FindTokenByPsychologistID(id uint) (*googleCalendar.Token, error)
 }
 
 func NewGCalendarService(repo repositories.GoogleCalendarTokenRepository) GoogleConsumerService {
@@ -32,14 +33,29 @@ type googleConsumerService struct {
 }
 
 func (service *googleConsumerService) Store(token string, expirationDateTime time.Time, psychologistID uint) error {
-	return service.repo.Store(token, expirationDateTime, psychologistID)
-}
+	_, err := service.repo.FindByPsyID(psychologistID)
 
-func (service *googleConsumerService) FindByPsyID(psychologistID uint, expirationDateTime time.Time) (*googleCalendar.TokenDTO, error) {
-	tokenDTO, err := service.repo.FindByPsyID(psychologistID, expirationDateTime)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			newToken, err := service.RequestGoogleAuthAuthorized()
+			return service.repo.Store(token, expirationDateTime, psychologistID)
+		}
+		return err
+	}
+
+	return service.repo.Update(token, psychologistID)
+}
+
+func (service *googleConsumerService) FindTokenByPsychologistID(id uint) (*googleCalendar.Token, error) {
+	return service.repo.FindTokenByPsychologistID(id)
+}
+
+func (service *googleConsumerService) FindByPsyID(psychologistID uint) (*googleCalendar.TokenDTO, error) {
+	tokenDTO, err := service.repo.FindByPsyID(psychologistID)
+	currentTime := time.Now()
+
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			newToken, err := service.RequestGoogleAuth()
 			expirationTime := utils.GetExpirationDate()
 			if err != nil {
 				return nil, err
@@ -57,6 +73,25 @@ func (service *googleConsumerService) FindByPsyID(psychologistID uint, expiratio
 		}
 		return nil, err
 	}
+
+	if tokenDTO.ExpirationDateTime.Before(currentTime) {
+		newToken, err := service.RequestGoogleAuthAuthorized()
+		expirationTime := utils.GetExpirationDate()
+		if err != nil {
+			return nil, err
+		}
+		err = service.Store(newToken, expirationTime, psychologistID)
+		if err != nil {
+			return nil, err
+		}
+		return &googleCalendar.TokenDTO{
+			PsyId:              psychologistID,
+			Token:              newToken,
+			ExpirationDateTime: expirationTime,
+			TenantID:           0,
+		}, nil
+	}
+
 	return tokenDTO, nil
 }
 
@@ -66,9 +101,6 @@ func (service *googleConsumerService) Update(token string, psychologistID uint) 
 
 func (service *googleConsumerService) Delete(psychologistID uint, tenantID uint) error {
 	return service.repo.Delete(psychologistID)
-}
-func NewGoogleConsumerService() GoogleConsumerService {
-	return &googleConsumerService{}
 }
 
 func (service *googleConsumerService) RequestGoogleAuth() (string, error) {

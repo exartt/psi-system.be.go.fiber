@@ -11,8 +11,8 @@ import (
 func RegisterRoutes(app *fiber.App) {
 	schedule := app.Group("/schedule/v1")
 	appointmentHandler := provideAppointment()
-	billToReceiveHandler := provideBillToReceive()
 	personRepo := repositories.NewPersonRepository(infrastructure.DB)
+	billToReceiveHandler := provideBillToReceive(personRepo)
 
 	schedule.Post("/create-appointment", appointmentHandler.CreateAppointment)
 	schedule.Get("/list-appointments", appointmentHandler.GetAppointmentsByYear)
@@ -29,10 +29,16 @@ func RegisterRoutes(app *fiber.App) {
 	patient := app.Group("/patient/v1")
 	patientHandler := providePatient(personRepo)
 	patient.Get("/list-patients", patientHandler.GetPatientsOptions)
+	patient.Post("/create-patient", patientHandler.CreatePatient)
+	patient.Put("/update-patient", patientHandler.UpdatePatient)
+	patient.Delete("/delete-patient/:id", patientHandler.DeletePatient)
+	patient.Get("/list-person-patient", patientHandler.GetPersonPatient)
+	patient.Get("/get-patient/:id", patientHandler.GetPatient)
 
 	psychologist := app.Group("/psychologist/v1")
 	psychologistHandler := providePsychologist(personRepo)
 	psychologist.Post("/create-psychologist", psychologistHandler.CreatePsychologist)
+
 }
 
 func providePsychologist(personRepo repositories.IPersonRepository) *handlers.PsychologistHandler {
@@ -43,13 +49,14 @@ func providePsychologist(personRepo repositories.IPersonRepository) *handlers.Ps
 
 func providePatient(personRepo repositories.IPersonRepository) *handlers.PatientHandler {
 	patientRepo := repositories.NewPatientRepository(infrastructure.DB)
-	patientService := services.NewPatientService(patientRepo)
+	patientService := services.NewPatientService(patientRepo, personRepo)
 	return handlers.NewPatientHandler(patientService)
 }
 
 func provideGoogleConsumer() *handlers.GoogleConsumerHandler {
-	gconsumer := services.NewGoogleConsumerService()
-	return handlers.NewGoogleConsumerHandler(gconsumer)
+	iGConsumer := repositories.NewGCalendarRepository(infrastructure.DB)
+	consumer := services.NewGCalendarService(iGConsumer)
+	return handlers.NewGoogleConsumerHandler(consumer)
 }
 
 func provideAppointment() *handlers.AppointmentHandler {
@@ -58,10 +65,10 @@ func provideAppointment() *handlers.AppointmentHandler {
 	return handlers.NewAppointmentHandler(appointmentService)
 }
 
-func provideBillToReceive() *handlers.BillToReceiveHandler {
+func provideBillToReceive(personRepo repositories.IPersonRepository) *handlers.BillToReceiveHandler {
 	billToReceiveRepo := repositories.NewCashFlowRepository(infrastructure.DB)
 	patientRepo := repositories.NewPatientRepository(infrastructure.DB)
-	patientService := services.NewPatientService(patientRepo)
+	patientService := services.NewPatientService(patientRepo, personRepo)
 	appointmentRepo := repositories.NewAppointmentRepository(infrastructure.DB)
 	appointmentService := services.NewAppointmentService(appointmentRepo)
 	billToReceiveService := services.NewBillToReceiveService(billToReceiveRepo, patientService, appointmentService)

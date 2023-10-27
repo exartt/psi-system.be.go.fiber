@@ -12,7 +12,8 @@ import (
 
 func JWTMiddleware() func(*fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
-		authorization := c.Get("Authorization") // Obtenha o cabeçalho "Authorization"
+
+		authorization := c.Get("Authorization")
 
 		// Verifique se o cabeçalho está vazio
 		if authorization == "" {
@@ -45,9 +46,17 @@ func JWTMiddleware() func(*fiber.Ctx) error {
 					"error": "Expired token",
 				})
 			}
+		}
 
-			// Defina o ID do usuário como uma variável local na solicitação
+		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+			if float64(time.Now().Unix()) > claims["exp"].(float64) {
+				return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+					"error": "Expired token",
+				})
+			}
+
 			c.Locals("userID", claims["sub"])
+			c.Locals("psychologistID", claims["psy_id"])
 		}
 		return c.Next()
 	}

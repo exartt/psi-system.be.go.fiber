@@ -10,6 +10,8 @@ import (
 
 type BillToReceiveService interface {
 	CreateBillToReceive(billDTO *cashflow.BillToPayDTO) error
+	ListBillToReceive() ([]*cashflow.CashFlow, error)
+	UpdateBillToReceive(billDTO *cashflow.BillToPayDTO) error
 }
 
 type billToReceiveService struct {
@@ -20,6 +22,10 @@ type billToReceiveService struct {
 
 func NewBillToReceiveService(repo repositories.BillToReceiveRepository, patientService PatientService, appointmentService AppointmentService) BillToReceiveService {
 	return &billToReceiveService{repo: repo, patientService: patientService, appointmentService: appointmentService}
+}
+
+func (s *billToReceiveService) ListBillToReceive() ([]*cashflow.CashFlow, error) {
+	return s.repo.ListBillToReceive()
 }
 
 func (s *billToReceiveService) CreateBillToReceive(billDTO *cashflow.BillToPayDTO) error {
@@ -53,6 +59,26 @@ func (s *billToReceiveService) CreateBillToReceive(billDTO *cashflow.BillToPayDT
 
 	logInfo("CreateBillToReceive", "Appointment status updated successfully")
 
+	return nil
+}
+
+func (s *billToReceiveService) UpdateBillToReceive(billDTO *cashflow.BillToPayDTO) error {
+	// Fetch existing bill to receive by ID
+	existingBill, err := s.repo.GetByID(uint64(billDTO.ID))
+	if err != nil {
+		return logAndReturnError("UpdateBillToReceive", "Error fetching existing bill", err)
+	}
+	if existingBill == nil {
+		return logAndReturnError("UpdateBillToReceive", "Bill not found", err)
+	}
+
+	existingBill.Description = billDTO.Description
+
+	if err = s.repo.UpdateBillToReceive(existingBill); err != nil {
+		return logAndReturnError("UpdateBillToReceive", "Database error", err)
+	}
+
+	logInfo("UpdateBillToReceive", "Bill to receive updated successfully")
 	return nil
 }
 

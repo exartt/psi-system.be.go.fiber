@@ -7,6 +7,7 @@ import (
 
 type IPersonRepository interface {
 	CreatePerson(person *person.Person) error
+	Update(person *person.Person) error
 }
 
 type personRepository struct {
@@ -20,4 +21,8 @@ func NewPersonRepository(db *gorm.DB) IPersonRepository {
 func (r *personRepository) CreatePerson(person *person.Person) error {
 	result := r.db.Create(person)
 	return result.Error
+}
+
+func (r *personRepository) Update(person *person.Person) error {
+	return r.db.Save(person).Error
 }

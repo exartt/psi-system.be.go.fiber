@@ -44,10 +44,13 @@ func (h *GoogleConsumerHandler) RequestGoogleAuthAuthorized(c *fiber.Ctx) error 
 
 func (h *GoogleConsumerHandler) HandleGoogleCallback(c *fiber.Ctx) error {
 	accessToken := c.FormValue("access_token")
-	psychologistID := uint(1)
+	psychologistID, err := utils.GetPsychologistIDFromContext(c)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Erro inesperado"})
+	}
 
 	expirationTime := utils.GetExpirationDate()
-	err := h.Service.Store(accessToken, expirationTime, psychologistID)
+	err = h.Service.Store(accessToken, expirationTime, psychologistID)
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Could not store token"})
 	}

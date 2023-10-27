@@ -11,6 +11,9 @@ import (
 	"psi-system.be.go.fiber/internal/domain/enums"
 	"psi-system.be.go.fiber/internal/domain/model/appointment"
 	"psi-system.be.go.fiber/internal/domain/services"
+	"psi-system.be.go.fiber/internal/domain/utils"
+	"psi-system.be.go.fiber/internal/infrastructure"
+	"psi-system.be.go.fiber/internal/repositories"
 	"strconv"
 	"time"
 )
@@ -37,8 +40,14 @@ func (h *AppointmentHandler) CreateAppointment(c *fiber.Ctx) error {
 	}
 
 	appointment := convertDTOToEntity(appointmentDTO)
+	googleRepo := repositories.NewGCalendarRepository(infrastructure.DB)
+	psyID, _ := utils.GetPsychologistIDFromContext(c)
+	token, err := googleRepo.FindByPsyID(psyID)
+	if err != nil {
+		return err
+	}
 
-	eventID, err := createGoogleCalendarEvent(&appointment, h.Logger)
+	eventID, err := createGoogleCalendarEvent(&appointment, h.Logger, token.Token)
 	if err != nil {
 		h.Logger.WithFields(logrus.Fields{
 			"action": "CreateAppointmentGoogleCalendar",
@@ -47,6 +56,9 @@ func (h *AppointmentHandler) CreateAppointment(c *fiber.Ctx) error {
 	}
 
 	appointment.EventID = eventID
+	appointment.PsychologistID = psyID
+	appointment.CreatedAt = time.Now()
+	appointment.UpdatedAt = time.Now()
 
 	if err := h.Service.Save(&appointment); err != nil {
 		h.Logger.WithFields(logrus.Fields{
@@ -97,10 +109,21 @@ func (h *AppointmentHandler) UpdateAppointment(c *fiber.Ctx) error {
 		return h.respondError(c, "UpdateAppointment", "Invalid request body", fiber.StatusBadRequest, err)
 	}
 
+	googleRepo := repositories.NewGCalendarRepository(infrastructure.DB)
+	psyID, _ := utils.GetPsychologistIDFromContext(c)
+	token, err := googleRepo.FindByPsyID(psyID)
+	if err != nil {
+		return err
+	}
 	if h.applyUpdates(currentAppointment, updates) {
-		if err := updateGoogleCalendarEvent(updates, updates.EventID, h.Logger); err != nil {
+		if err := updateGoogleCalendarEvent(updates, updates.EventID, h.Logger, token.Token); err != nil {
 			return h.respondError(c, "UpdateAppointment", "Error updating Google Calendar event", fiber.StatusInternalServerError, err)
 		}
+
+		currentAppointment.Status = enums.Remarcado
+		currentAppointment.UpdatedAt = time.Now()
+		currentAppointment.PsychologistID = psyID
+
 		if err := h.Service.Update(uint(id), currentAppointment); err != nil {
 			return h.respondError(c, "UpdateAppointment", "Error updating appointment", fiber.StatusInternalServerError, err)
 		}
@@ -121,11 +144,20 @@ func (h *AppointmentHandler) CancelAppointment(c *fiber.Ctx) error {
 		return h.respondError(c, "CancelAppointment", "Error fetching appointment", fiber.StatusInternalServerError, err)
 	}
 
-	if err := deleteGoogleCalendarEvent(currentAppointment.EventID, h.Logger); err != nil {
+	googleRepo := repositories.NewGCalendarRepository(infrastructure.DB)
+	psyID, _ := utils.GetPsychologistIDFromContext(c)
+	token, err := googleRepo.FindByPsyID(psyID)
+	if err != nil {
+		return err
+	}
+
+	if err := deleteGoogleCalendarEvent(currentAppointment.EventID, h.Logger, token.Token); err != nil {
 		return h.respondError(c, "CancelAppointment", "Error canceling Google Calendar event", fiber.StatusInternalServerError, err)
 	}
 
 	currentAppointment.Status = enums.Cancelado
+	currentAppointment.UpdatedAt = time.Now()
+	currentAppointment.PsychologistID = psyID
 
 	if err := h.Service.Update(uint(id), currentAppointment); err != nil {
 		return h.respondError(c, "CancelAppointment", "Error updating appointment", fiber.StatusInternalServerError, err)
@@ -189,12 +221,13 @@ func (h *AppointmentHandler) respondError(c *fiber.Ctx, action, message string, 
 	return c.Status(statusCode).JSON(fiber.Map{"error": message})
 }
 
-func deleteGoogleCalendarEvent(eventID string, logger *logrus.Logger) error {
+func deleteGoogleCalendarEvent(eventID string, logger *logrus.Logger, token string) error {
 	client := &http.Client{}
 
 	deleteEventURL := enums.DELETE.String(eventID)
 
 	req, err := http.NewRequest(http.MethodDelete, deleteEventURL, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
 	if err != nil {
 		logger.WithFields(logrus.Fields{
 			"action": "deleteGoogleCalendarEvent",
@@ -203,17 +236,23 @@ func deleteGoogleCalendarEvent(eventID string, logger *logrus.Logger) error {
 	}
 
 	resp, err := client.Do(req)
-	if err != nil || (resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent) {
+	if err != nil {
+		if resp != nil && resp.StatusCode == 410 {
+			logger.WithFields(logrus.Fields{
+				"action": "deleteGoogleCalendarEvent",
+			}).Info("Resource has already been deleted. Ignoring.")
+			return nil
+		}
 		logger.WithFields(logrus.Fields{
 			"action": "deleteGoogleCalendarEvent",
-		}).Error("Failed to delete calendar event: ", err)
-		return fmt.Errorf("Failed to delete calendar event")
+		}).Error("Failed to delete event: ", err)
+		return fmt.Errorf("Failed to delete event")
 	}
 
 	return nil
 }
 
-func createGoogleCalendarEvent(appointment *appointment.Appointment, logger *logrus.Logger) (string, error) {
+func createGoogleCalendarEvent(appointment *appointment.Appointment, logger *logrus.Logger, token string) (string, error) {
 	calendarEvent := map[string]interface{}{
 		"summary":     appointment.Summary,
 		"description": appointment.Description,
@@ -236,11 +275,22 @@ func createGoogleCalendarEvent(appointment *appointment.Appointment, logger *log
 		return "", fmt.Errorf("Failed to marshal JSON")
 	}
 
-	resp, err := http.Post(enums.CREATE.String(""), "application/json", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", enums.CREATE.String(""), bytes.NewBuffer(jsonData))
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
 	if err != nil || resp.StatusCode != http.StatusOK {
+		// Log the error
 		logger.WithFields(logrus.Fields{
 			"action": "createGoogleCalendarEvent",
 		}).Error("Failed to create calendar event: ", err)
+
+		if resp != nil {
+			resp.Body.Close()
+		}
+
 		return "", fmt.Errorf("Failed to create calendar event")
 	}
 
@@ -264,7 +314,7 @@ func createGoogleCalendarEvent(appointment *appointment.Appointment, logger *log
 	return eventID, nil
 }
 
-func updateGoogleCalendarEvent(appointment *appointment.Appointment, eventID string, logger *logrus.Logger) error {
+func updateGoogleCalendarEvent(appointment *appointment.Appointment, eventID string, logger *logrus.Logger, token string) error {
 	calendarEvent := map[string]interface{}{
 		"summary":     appointment.Summary,
 		"description": appointment.Description,
@@ -299,6 +349,7 @@ func updateGoogleCalendarEvent(appointment *appointment.Appointment, eventID str
 		return fmt.Errorf("Failed to create request")
 	}
 
+	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil || resp.StatusCode != http.StatusOK {
