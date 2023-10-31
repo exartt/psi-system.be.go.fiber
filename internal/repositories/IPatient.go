@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"errors"
 	"gorm.io/gorm"
 	"psi-system.be.go.fiber/internal/domain/model/person"
 )
@@ -14,6 +15,7 @@ type PatientRepository interface {
 	Delete(ID uint) error
 	GetPersonPatient(psychologistID uint) ([]person.PersonPatient, error)
 	GetPatient(psychologistID uint, patientID uint) (person.DTO, error)
+	DeactivatePatient(ID uint) error
 }
 
 type patientRepository struct {
@@ -21,8 +23,9 @@ type patientRepository struct {
 }
 
 type PatientResult struct {
-	ID         uint
-	PersonName string
+	ID           uint
+	PersonName   string
+	SessionPrice string
 }
 
 func NewPatientRepository(db *gorm.DB) PatientRepository {
@@ -45,9 +48,9 @@ func (r *patientRepository) GetPatientsWithPersonName(psychologistID uint) ([]Pa
 	var patients []PatientResult
 
 	err := r.db.Table("patients").
-		Select("patients.id, people.name as person_name").
-		Joins("JOIN people ON people.id = patients.person_id").
-		Where("patients.psychologist_id = ?", psychologistID).
+		Select("patients.id, p2.name as \"PersonName\", patients.session_price as \"SessionPrice\"").
+		Joins("JOIN people p2 ON p2.id = patients.person_id").
+		Where("patients.psychologist_id = ? AND p2.is_active = true", psychologistID).
 		Scan(&patients).Error
 
 	if err != nil {
@@ -61,8 +64,8 @@ func (r *patientRepository) GetPersonPatient(psychologistID uint) ([]person.Pers
 	var patients []person.PersonPatient
 
 	err := r.db.Table("patients").
-		Select("patients.id, people.name as Name, people.email as Email").
-		Joins("JOIN people ON people.id = patients.person_id").
+		Select("patients.id, p.name as Name, p.email as Email, p.is_active as \"isActive\", patients.is_plan as \"isPlan\"").
+		Joins("JOIN people p ON p.id = patients.person_id").
 		Where("patients.psychologist_id = ?", psychologistID).
 		Scan(&patients).Error
 
@@ -102,4 +105,20 @@ func (r *patientRepository) Update(patient *person.Patient) error {
 
 func (r *patientRepository) Delete(ID uint) error {
 	return r.db.Delete(&person.Patient{}, ID).Error
+}
+
+func (r *patientRepository) DeactivatePatient(ID uint) error {
+	var patient person.Patient
+	if err := r.db.Where("id = ?", ID).First(&patient).Error; err != nil {
+		return err
+	}
+
+	result := r.db.Model(person.Person{}).Where("id = ?", patient.PersonID).Update("is_active", false)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("Patient not found")
+	}
+	return nil
 }

@@ -14,12 +14,23 @@ func RegisterRoutes(app *fiber.App) {
 	personRepo := repositories.NewPersonRepository(infrastructure.DB)
 	billToReceiveHandler := provideBillToReceive(personRepo)
 
+	// scheduler
 	schedule.Post("/create-appointment", appointmentHandler.CreateAppointment)
 	schedule.Get("/list-appointments", appointmentHandler.GetAppointmentsByYear)
 	schedule.Put("/update-appointment/:id/status/:status", appointmentHandler.UpdateAppointment)
 	schedule.Put("/update-appointment/:id", appointmentHandler.UpdateAppointment)
 	schedule.Put("/update-appointment/:id/cancel-appointment", appointmentHandler.CancelAppointment)
-	schedule.Post("/confirm-appointment", billToReceiveHandler.CreateBillToReceive)
+	schedule.Post("/confirm-appointment", billToReceiveHandler.CreateBill)
+
+	// bill
+	billToReceive := app.Group("/transactions/v1")
+	billToReceive.Get("/list-bill", billToReceiveHandler.ListBillByType)
+	billToReceive.Post("/create-bill", billToReceiveHandler.CreateBill)
+	billToReceive.Get("/get-bill/:id", billToReceiveHandler.GetByID)
+	billToReceive.Put("/update-bill", billToReceiveHandler.UpdateBill)
+	billToReceive.Delete("/delete-bill/:id", billToReceiveHandler.Delete)
+	billToReceive.Put("/update-bill/:id/confirm", billToReceiveHandler.ConfirmPaymentBill)
+	billToReceive.Put("/update-bill/:id/remove", billToReceiveHandler.RemoveConfirmationPaymentBill)
 
 	calendar := app.Group("/calendar/v1")
 	googleConsumerHandler := provideGoogleConsumer()
@@ -31,7 +42,7 @@ func RegisterRoutes(app *fiber.App) {
 	patient.Get("/list-patients", patientHandler.GetPatientsOptions)
 	patient.Post("/create-patient", patientHandler.CreatePatient)
 	patient.Put("/update-patient", patientHandler.UpdatePatient)
-	patient.Delete("/delete-patient/:id", patientHandler.DeletePatient)
+	patient.Delete("/delete-patient/:id", patientHandler.DeactivatePatient)
 	patient.Get("/list-person-patient", patientHandler.GetPersonPatient)
 	patient.Get("/get-patient/:id", patientHandler.GetPatient)
 
@@ -66,11 +77,11 @@ func provideAppointment() *handlers.AppointmentHandler {
 }
 
 func provideBillToReceive(personRepo repositories.IPersonRepository) *handlers.BillToReceiveHandler {
-	billToReceiveRepo := repositories.NewCashFlowRepository(infrastructure.DB)
+	transactionsRepo := repositories.NewCashFlowRepository(infrastructure.DB)
 	patientRepo := repositories.NewPatientRepository(infrastructure.DB)
 	patientService := services.NewPatientService(patientRepo, personRepo)
 	appointmentRepo := repositories.NewAppointmentRepository(infrastructure.DB)
 	appointmentService := services.NewAppointmentService(appointmentRepo)
-	billToReceiveService := services.NewBillToReceiveService(billToReceiveRepo, patientService, appointmentService)
+	billToReceiveService := services.NewBillToReceiveService(transactionsRepo, patientService, appointmentService)
 	return handlers.NewBillToReceiveHandler(billToReceiveService)
 }

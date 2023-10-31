@@ -1,9 +1,11 @@
 package person
 
 type PersonPatient struct {
-	ID    uint
-	Name  string
-	Email string
+	ID       uint
+	Name     string
+	Email    string
+	isActive bool
+	isPlan   bool
 }
 
 type DTO struct {

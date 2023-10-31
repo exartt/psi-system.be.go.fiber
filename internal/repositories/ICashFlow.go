@@ -3,14 +3,16 @@ package repositories
 import (
 	"errors"
 	"gorm.io/gorm"
+	"psi-system.be.go.fiber/internal/domain/enums"
 	"psi-system.be.go.fiber/internal/domain/model/cashflow"
 )
 
 type CashFlowRepository interface {
-	CreateBillToReceive(billToReceive *cashflow.CashFlow) error
+	CreateBill(billToReceive *cashflow.CashFlow) error
 	GetByID(id uint64) (*cashflow.CashFlow, error)
-	ListBillToReceive() ([]*cashflow.CashFlow, error)
-	UpdateBillToReceive(billToReceive *cashflow.CashFlow) error
+	ListBillByType(psychologistID uint, typeTransaction enums.TransactionType) ([]cashflow.BillToReceiveTable, error)
+	UpdateBill(billToReceive *cashflow.CashFlow) error
+	Delete(id uint64) error
 }
 
 type cashFlowRepository struct {

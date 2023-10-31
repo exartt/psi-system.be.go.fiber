@@ -10,8 +10,9 @@ import (
 )
 
 type Option struct {
-	Value string `json:"value"`
-	Label string `json:"label"`
+	Value        string `json:"value"`
+	Label        string `json:"label"`
+	SessionPrice string `json:"session_price"`
 }
 
 type PatientService interface {
@@ -22,6 +23,7 @@ type PatientService interface {
 	Delete(ID uint) error
 	GetPersonPatient(psychologistID uint) ([]person.PersonPatient, error)
 	GetPatient(psychologistID uint, patientID uint) (person.DTO, error)
+	DeactivatePatient(ID uint) error
 }
 
 type patientService struct {
@@ -58,8 +60,9 @@ func (s *patientService) GetPatientsOptions(psychologistID uint) ([]Option, erro
 	var options []Option
 	for _, patient := range patients {
 		options = append(options, Option{
-			Value: fmt.Sprint(patient.ID),
-			Label: patient.PersonName,
+			Value:        fmt.Sprint(patient.ID),
+			Label:        patient.PersonName,
+			SessionPrice: patient.SessionPrice,
 		})
 	}
 	return options, nil
@@ -160,4 +163,8 @@ func (s *patientService) Update(patient person.DTO, psychologistID uint) (*perso
 
 func (s *patientService) Delete(ID uint) error {
 	return s.repo.Delete(ID)
+}
+
+func (s *patientService) DeactivatePatient(ID uint) error {
+	return s.repo.DeactivatePatient(ID)
 }

@@ -25,9 +25,9 @@ func NewPatientHandler(service services.PatientService) *PatientHandler {
 func (h *PatientHandler) GetPatientsOptions(c *fiber.Ctx) error {
 	psychologistID, err := utils.GetPsychologistIDFromContext(c)
 	options, err := h.Service.GetPatientsOptions(psychologistID)
-	if err != nil {
+	if err != nil || len(options) == 0 {
 		fmt.Println(err)
-		return c.Status(500).SendString("Não há pacientes cadastrados, para essa funcionalidade é necessário ter pacientes cadastrados")
+		return c.Status(500).SendString("Não há pacientes cadastrados. Para cadastrar um novo paciente, acesse a aba 'Pacientes' no menu lateral e clique em 'Novo Paciente'")
 	}
 	return c.JSON(options)
 }
@@ -85,6 +85,22 @@ func (h *PatientHandler) GetPersonPatient(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(personPatient)
+}
+
+func (h *PatientHandler) DeactivatePatient(c *fiber.Ctx) error {
+	ID, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).SendString("Invalid ID")
+	}
+
+	if err := h.Service.DeactivatePatient(uint(ID)); err != nil {
+		if err.Error() == "Patient not found" {
+			return c.Status(404).SendString("Patient not found")
+		}
+		return c.Status(500).SendString("Internal Server Error")
+	}
+
+	return c.SendString("Patient deactivated")
 }
 
 func (h *PatientHandler) GetPatient(c *fiber.Ctx) error {
