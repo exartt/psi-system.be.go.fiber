@@ -24,6 +24,7 @@ type PatientService interface {
 	GetPersonPatient(psychologistID uint) ([]person.PersonPatient, error)
 	GetPatient(psychologistID uint, patientID uint) (person.DTO, error)
 	DeactivatePatient(ID uint) error
+	CountNewPatients(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) (int64, error)
 }
 
 type patientService struct {
@@ -167,4 +168,8 @@ func (s *patientService) Delete(ID uint) error {
 
 func (s *patientService) DeactivatePatient(ID uint) error {
 	return s.repo.DeactivatePatient(ID)
+}
+
+func (s *patientService) CountNewPatients(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) (int64, error) {
+	return s.repo.CountNewPatients(psychologistID, filteredDateInitial, filteredDateFinal)
 }

@@ -128,7 +128,7 @@ func (h *BillToReceiveHandler) RemoveConfirmationPaymentBill(c *fiber.Ctx) error
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Ocorreu um erro inesperado, por favor tente novamente mais tarde"})
 	}
 
-	bill.Status = enums.PAID.String()
+	bill.Status = enums.PENDING.String()
 
 	if err := h.Service.StatusUpdateBill(bill); err != nil {
 
@@ -183,4 +183,18 @@ func (h *BillToReceiveHandler) Delete(c *fiber.Ctx) error {
 	}
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{"message": "Bill to receive deleted successfully"})
+}
+
+func (h *BillToReceiveHandler) GetCashFlowList(c *fiber.Ctx) error {
+	psychologistID, err := utils.GetPsychologistIDFromContext(c)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Você não está logado no sistema, por favor faça o login novamente"})
+	}
+
+	bills, err := h.Service.ListCashFlow(psychologistID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Erro ao listar fluxo de caixa"})
+	}
+
+	return c.Status(http.StatusOK).JSON(bills)
 }

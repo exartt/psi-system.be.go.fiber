@@ -6,6 +6,7 @@ import (
 	"psi-system.be.go.fiber/internal/domain/enums"
 	"psi-system.be.go.fiber/internal/domain/model/appointment"
 	"psi-system.be.go.fiber/internal/repositories"
+	"time"
 )
 
 var Logger = logrus.New()
@@ -16,6 +17,7 @@ type AppointmentService interface {
 	UpdateStatusAppointment(id uint, status enums.StatusAgendamento) error
 	Update(id uint, appointment *appointment.Appointment) error
 	GetByID(id uint) (*appointment.Appointment, error)
+	CountAppointmentsByDate(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) (int64, error)
 }
 
 func NewAppointmentService(repo repositories.AppointmentRepository) AppointmentService {
@@ -183,4 +185,16 @@ func (s *appointmentService) GetByID(ID uint) (*appointment.Appointment, error) 
 	}
 
 	return appointment, nil
+}
+
+func (s *appointmentService) CountAppointmentsByDate(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) (int64, error) {
+	count, err := s.repo.CountAppointmentsByDate(psychologistID, filteredDateInitial, filteredDateFinal)
+	if err != nil {
+		Logger.WithFields(logrus.Fields{
+			"action": "CountAppointments",
+		}).Error("Error counting appointments: ", err)
+		return 0, err
+	}
+
+	return count, nil
 }

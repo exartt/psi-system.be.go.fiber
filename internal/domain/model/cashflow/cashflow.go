@@ -26,6 +26,15 @@ type DTO struct {
 	Description     string
 	RecordDate      time.Time
 	PatientName     string
+	UpdatedAt       time.Time
+}
+
+type Table struct {
+	Description     string    `gorm:"column:descricao"`
+	ID              uint      `gorm:"column:id_fluxo_caixa"`
+	TransactionType string    `gorm:"column:tipo_transacao"`
+	Value           float64   `gorm:"column:flu_valor"`
+	UpdatedAt       time.Time `gorm:"column:updated_at"`
 }
 
 //Appointment     appointment.Appointment `gorm:"foreignKey:AppointmentID"`

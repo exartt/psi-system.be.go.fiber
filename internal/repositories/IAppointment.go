@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"errors"
 	"strconv"
 	"time"
 
@@ -22,6 +23,7 @@ type AppointmentRepository interface {
 	CheckDateByTimeRangeUpdate(start, end time.Time) ([]*appointment.Appointment, error)
 	UpdateStatusAppointment(ID uint, status enums.StatusAgendamento) error
 	GetByYear(year int) ([]*appointment.Appointment, error)
+	CountAppointmentsByDate(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) (int64, error)
 }
 
 type appointmentRepository struct {
@@ -105,4 +107,24 @@ func (r *appointmentRepository) CheckDateByTimeRangeUpdate(start, end time.Time)
 	var appointments []*appointment.Appointment
 	err := r.db.Where("\"start\" < ? AND \"end\" > ?", end, start).Find(&appointments).Error
 	return appointments, err
+}
+
+func (r *appointmentRepository) CountAppointmentsByDate(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) (int64, error) {
+	var count int64
+	db := r.db
+	db = db.Table("appointments").Where("id = ?", psychologistID)
+	if !filteredDateInitial.IsZero() {
+		db = db.Where("start >= ?", filteredDateInitial)
+	}
+	if !filteredDateFinal.IsZero() {
+		db = db.Where("start <= ?", filteredDateFinal)
+	}
+
+	db = db.Where("status = 4")
+	result := db.Model(&appointment.Appointment{}).Count(&count)
+	if result != nil && errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return 0, result.Error
+	}
+
+	return count, nil
 }

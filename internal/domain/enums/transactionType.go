@@ -6,6 +6,7 @@ const (
 	RECEIVABLE TransactionType = iota
 	PAYABLE
 	CASHFLOW
+	CONFIRM_PAYMENT
 )
 
 func (s TransactionType) String() string {
@@ -14,6 +15,8 @@ func (s TransactionType) String() string {
 		return "PAYABLE"
 	case CASHFLOW:
 		return "CASHFLOW"
+	case CONFIRM_PAYMENT:
+		return "CONFIRM_PAYMENT"
 	default:
 		return "RECEIVABLE"
 	}

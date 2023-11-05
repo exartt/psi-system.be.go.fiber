@@ -17,6 +17,8 @@ type TransactionService interface {
 	StatusUpdateBill(billDTO *cashflow.CashFlow) error
 	GetByID(id uint64) (*cashflow.CashFlow, error)
 	Delete(id uint64) error
+	ListCashFlow(psychologistID uint) ([]cashflow.Table, error)
+	GetCashFlowByDate(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) ([]cashflow.CashFlow, error)
 }
 
 type billToReceiveService struct {
@@ -149,4 +151,12 @@ func (s *billToReceiveService) GetByID(id uint64) (*cashflow.CashFlow, error) {
 
 func (s *billToReceiveService) Delete(id uint64) error {
 	return s.repo.Delete(id)
+}
+
+func (s *billToReceiveService) ListCashFlow(psychologistID uint) ([]cashflow.Table, error) {
+	return s.repo.ListCashFlow(psychologistID)
+}
+
+func (s *billToReceiveService) GetCashFlowByDate(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) ([]cashflow.CashFlow, error) {
+	return s.repo.GetCashFlowByDate(psychologistID, filteredDateInitial, filteredDateFinal)
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"gorm.io/gorm"
 	"psi-system.be.go.fiber/internal/domain/model/person"
+	"time"
 )
 
 type PatientRepository interface {
@@ -16,6 +17,7 @@ type PatientRepository interface {
 	GetPersonPatient(psychologistID uint) ([]person.PersonPatient, error)
 	GetPatient(psychologistID uint, patientID uint) (person.DTO, error)
 	DeactivatePatient(ID uint) error
+	CountNewPatients(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) (int64, error)
 }
 
 type patientRepository struct {
@@ -121,4 +123,19 @@ func (r *patientRepository) DeactivatePatient(ID uint) error {
 		return errors.New("Patient not found")
 	}
 	return nil
+}
+
+func (r *patientRepository) CountNewPatients(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) (int64, error) {
+	var count int64
+	err := r.db.Table("patients").
+		Select("count(patients.id)").
+		Joins("JOIN people p ON p.id = patients.person_id").
+		Where("patients.psychologist_id = ? AND p.created_at >= ? and p.created_at <= ?", psychologistID, filteredDateInitial, filteredDateFinal).
+		Scan(&count).Error
+
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
