@@ -16,6 +16,8 @@ type CashFlowRepository interface {
 	Delete(id uint64) error
 	ListCashFlow(psychologistID uint) ([]cashflow.Table, error)
 	GetCashFlowByDate(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) ([]cashflow.CashFlow, error)
+	GetStatusBills(psychologistID uint) ([]cashflow.StatusBill, error)
+	ThrowMonthlyReceives() error
 }
 
 type cashFlowRepository struct {
@@ -69,4 +71,23 @@ func (r *cashFlowRepository) GetCashFlowByDate(psychologistID uint, filteredDate
 	}
 
 	return cashFlows, nil
+}
+
+func (r *cashFlowRepository) GetStatusBills(psychologistID uint) ([]cashflow.StatusBill, error) {
+	var statusBills []cashflow.StatusBill
+
+	err := r.db.Table("cash_flows").
+		Select("CASE WHEN status = 'PENDING' THEN 0 WHEN status = 'PAID' THEN 1 WHEN status = 'OVERDUE' THEN 2 WHEN status = 'CANCELED' THEN 3 WHEN status = 'REFUNDED' THEN 4 ELSE -1 END as status, count(*) as count").
+		Where("id_psicologo = ?", psychologistID).
+		Group("status").
+		Scan(&statusBills)
+
+	if err.Error != nil {
+		if !errors.Is(err.Error, gorm.ErrRecordNotFound) {
+			return []cashflow.StatusBill{}, nil
+		}
+		return nil, err.Error
+	}
+
+	return statusBills, nil
 }

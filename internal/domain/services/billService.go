@@ -19,6 +19,7 @@ type TransactionService interface {
 	Delete(id uint64) error
 	ListCashFlow(psychologistID uint) ([]cashflow.Table, error)
 	GetCashFlowByDate(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) ([]cashflow.CashFlow, error)
+	GetStatusBills(psychologistID uint) ([]cashflow.StatusBill, error)
 }
 
 type billToReceiveService struct {
@@ -119,9 +120,16 @@ func (s *billToReceiveService) StatusUpdateBill(billToPersist *cashflow.CashFlow
 }
 
 func prepareCashFlow(value float64, billDTO *cashflow.BillDTO, psychologistID uint, transactionType enums.TransactionType) (*cashflow.CashFlow, error) {
-	parsedTime, err := time.Parse("2006/01/02", billDTO.RecordDate)
-	if err != nil {
-		return &cashflow.CashFlow{}, errors.New("Ocorreu um erro com a data, verifique se foi inserida corretamente.")
+	var parsedTime time.Time
+
+	if billDTO.RecordDate != "" {
+		var err error
+		parsedTime, err = time.Parse("2006/01/02", billDTO.RecordDate)
+		if err != nil {
+			return nil, errors.New("Erro ao analisar a data. Verifique se foi inserida corretamente.")
+		}
+	} else {
+		parsedTime = time.Now()
 	}
 
 	return &cashflow.CashFlow{
@@ -159,4 +167,9 @@ func (s *billToReceiveService) ListCashFlow(psychologistID uint) ([]cashflow.Tab
 
 func (s *billToReceiveService) GetCashFlowByDate(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) ([]cashflow.CashFlow, error) {
 	return s.repo.GetCashFlowByDate(psychologistID, filteredDateInitial, filteredDateFinal)
+}
+
+func (s *billToReceiveService) GetStatusBills(psychologistID uint) ([]cashflow.StatusBill, error) {
+	statusBills, err := s.repo.GetStatusBills(psychologistID)
+	return statusBills, err
 }

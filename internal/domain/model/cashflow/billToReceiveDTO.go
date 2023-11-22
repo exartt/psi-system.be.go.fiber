@@ -1,6 +1,9 @@
 package cashflow
 
-import "time"
+import (
+	"psi-system.be.go.fiber/internal/domain/enums"
+	"time"
+)
 
 type BillDTO struct {
 	ID              uint
@@ -19,4 +22,18 @@ type BillToReceiveTable struct {
 	Description string
 	Status      string
 	RecordDate  time.Time
+}
+
+type Bill struct {
+	ID          uint
+	Value       float64
+	PatientName string
+	Description string
+	Status      string
+	RecordDate  time.Time
+}
+
+type StatusBill struct {
+	Status enums.StatusTransaction
+	Count  int
 }

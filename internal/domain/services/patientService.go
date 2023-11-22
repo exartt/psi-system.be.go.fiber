@@ -9,15 +9,9 @@ import (
 	"time"
 )
 
-type Option struct {
-	Value        string `json:"value"`
-	Label        string `json:"label"`
-	SessionPrice string `json:"session_price"`
-}
-
 type PatientService interface {
 	GetByID(ID uint) (*person.Patient, error)
-	GetPatientsOptions(psychologistID uint) ([]Option, error)
+	GetPatientsOptions(psychologistID uint) ([]person.Option, error)
 	Create(patient person.DTO, psychologistID uint) (*person.Patient, error)
 	Update(patient person.DTO, psychologistID uint) (*person.Patient, error)
 	Delete(ID uint) error
@@ -25,11 +19,20 @@ type PatientService interface {
 	GetPatient(psychologistID uint, patientID uint) (person.DTO, error)
 	DeactivatePatient(ID uint) error
 	CountNewPatients(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) (int64, error)
+	GetPatientOption(psychologistID uint, patientID uint) (person.Option, error)
 }
 
 type patientService struct {
 	repo       repositories.PatientRepository
 	personRepo repositories.IPersonRepository
+}
+
+func (s *patientService) GetPatientOption(psychologistID uint, patientID uint) (person.Option, error) {
+	patient, err := s.repo.GetPatientOption(psychologistID, patientID)
+	if err != nil {
+		return person.Option{}, err
+	}
+	return patient, nil
 }
 
 func NewPatientService(repo repositories.PatientRepository, personRepo repositories.IPersonRepository) PatientService {
@@ -52,15 +55,15 @@ func (s *patientService) GetByID(ID uint) (*person.Patient, error) {
 	return patient, nil
 }
 
-func (s *patientService) GetPatientsOptions(psychologistID uint) ([]Option, error) {
+func (s *patientService) GetPatientsOptions(psychologistID uint) ([]person.Option, error) {
 	patients, err := s.repo.GetPatientsWithPersonName(psychologistID)
 	if err != nil {
 		return nil, err
 	}
 
-	var options []Option
+	var options []person.Option
 	for _, patient := range patients {
-		options = append(options, Option{
+		options = append(options, person.Option{
 			Value:        fmt.Sprint(patient.ID),
 			Label:        patient.PersonName,
 			SessionPrice: patient.SessionPrice,

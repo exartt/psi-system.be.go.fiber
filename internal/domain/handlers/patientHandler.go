@@ -122,3 +122,23 @@ func (h *PatientHandler) GetPatient(c *fiber.Ctx) error {
 
 	return c.JSON(dto)
 }
+
+func (h *PatientHandler) GetPatientOption(ctx *fiber.Ctx) error {
+	psychologistID, err := utils.GetPsychologistIDFromContext(ctx)
+	if err != nil {
+		return ctx.Status(400).SendString("Bad Request: Invalid Psychologist ID")
+	}
+
+	patientIDStr := ctx.Params("id")
+	patientID, err := strconv.ParseUint(patientIDStr, 10, 64)
+	if err != nil {
+		return ctx.Status(400).SendString("Bad Request: Invalid Patient ID")
+	}
+
+	dto, err := h.Service.GetPatientOption(psychologistID, uint(patientID))
+	if err != nil {
+		return ctx.Status(500).SendString("Internal Server Error")
+	}
+
+	return ctx.JSON(dto)
+}

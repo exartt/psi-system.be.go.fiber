@@ -18,6 +18,7 @@ type PatientRepository interface {
 	GetPatient(psychologistID uint, patientID uint) (person.DTO, error)
 	DeactivatePatient(ID uint) error
 	CountNewPatients(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) (int64, error)
+	GetPatientOption(psychologistID uint, patientID uint) (person.Option, error)
 }
 
 type patientRepository struct {
@@ -66,9 +67,10 @@ func (r *patientRepository) GetPersonPatient(psychologistID uint) ([]person.Pers
 	var patients []person.PersonPatient
 
 	err := r.db.Table("patients").
-		Select("patients.id, p.name as Name, p.email as Email, p.is_active as \"isActive\", patients.is_plan as \"isPlan\"").
+		Select("patients.id, p.name as Name, p.email as Email, p.is_active as is_active, patients.is_plan as is_plan").
 		Joins("JOIN people p ON p.id = patients.person_id").
 		Where("patients.psychologist_id = ?", psychologistID).
+		Order("p.is_active DESC").
 		Scan(&patients).Error
 
 	if err != nil {
@@ -123,6 +125,22 @@ func (r *patientRepository) DeactivatePatient(ID uint) error {
 		return errors.New("Patient not found")
 	}
 	return nil
+}
+
+func (r *patientRepository) GetPatientOption(psychologistID uint, patientID uint) (person.Option, error) {
+	var patient person.Option
+
+	err := r.db.Table("patients").
+		Select("patients.id as \"Value\", p2.name as \"Label\", patients.session_price as \"SessionPrice\"").
+		Joins("JOIN people p2 ON p2.id = patients.person_id").
+		Where("patients.psychologist_id = ? AND patients.id = ?", psychologistID, patientID).
+		Scan(&patient).Error
+
+	if err != nil {
+		return person.Option{}, err
+	}
+
+	return patient, nil
 }
 
 func (r *patientRepository) CountNewPatients(psychologistID uint, filteredDateInitial time.Time, filteredDateFinal time.Time) (int64, error) {

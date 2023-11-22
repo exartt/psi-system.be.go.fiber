@@ -9,6 +9,8 @@ import (
 	"psi-system.be.go.fiber/internal/delivery/http"
 	"psi-system.be.go.fiber/internal/infrastructure"
 	"psi-system.be.go.fiber/internal/infrastructure/database"
+	"psi-system.be.go.fiber/internal/jobs"
+	"psi-system.be.go.fiber/internal/repositories"
 	"psi-system.be.go.fiber/pkg"
 )
 
@@ -16,6 +18,9 @@ func main() {
 	pkg.LoadEnv()
 	infrastructure.ConnectDB()
 	database.Migrate()
+
+	transactionsRepo := repositories.NewCashFlowRepository(infrastructure.DB)
+	jobs.ScheduleJob(transactionsRepo)
 
 	app := fiber.New()
 	app.Use(recover.New())

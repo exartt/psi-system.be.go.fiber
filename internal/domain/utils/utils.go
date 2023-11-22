@@ -20,3 +20,9 @@ func CastToTransactioTypeEnum(typeParam string) (enums.TransactionType, error) {
 		return enums.RECEIVABLE, nil
 	}
 }
+
+func GetFifthDayOfCurrentMonth() string {
+	firstDayOfMonth := time.Now().AddDate(0, 0, -time.Now().Day()+1)
+	fifthDayOfMonth := firstDayOfMonth.AddDate(0, 0, 4)
+	return fifthDayOfMonth.Format("2006-01-02")
+}

@@ -18,6 +18,18 @@ type CashFlow struct {
 	UpdatedAt       time.Time `gorm:"column:updated_at"`
 }
 
+type BillToReceiveMonthly struct {
+	PatientID      uint      `gorm:"column:id_paciente;"`
+	PsychologistID uint      `gorm:"column:id_psicologo"`
+	Value          float64   `gorm:"column:flu_valor"`
+	Description    string    `gorm:"column:descricao"`
+	TipoTransacao  string    `gorm:"column:tipo_transacao"`
+	Status         string    `gorm:"column:status"`
+	RecordDate     time.Time `gorm:"column:flu_data_registro"`
+	CreatedAt      time.Time `gorm:"column:created_at"`
+	UpdatedAt      time.Time `gorm:"column:updated_at"`
+}
+
 type DTO struct {
 	ID              uint
 	PatientID       uint
@@ -36,5 +48,3 @@ type Table struct {
 	Value           float64   `gorm:"column:flu_valor"`
 	UpdatedAt       time.Time `gorm:"column:updated_at"`
 }
-
-//Appointment     appointment.Appointment `gorm:"foreignKey:AppointmentID"`

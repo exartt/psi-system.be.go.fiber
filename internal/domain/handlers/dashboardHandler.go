@@ -3,6 +3,7 @@ package handlers
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
+	"net/http"
 	"psi-system.be.go.fiber/internal/domain/model/cashflow"
 	"psi-system.be.go.fiber/internal/domain/model/dashboard"
 	"psi-system.be.go.fiber/internal/domain/services"
@@ -64,6 +65,17 @@ func (h *DashboardHandler) GetDashboardData(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(dashboardData)
 
 }
+
+func (h *DashboardHandler) GetStatusBills(c *fiber.Ctx) error {
+	psychologistID, err := utils.GetPsychologistIDFromContext(c)
+	statusBills, err := h.TransactionService.GetStatusBills(psychologistID)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Internal Server Error"})
+	}
+
+	return c.Status(http.StatusOK).JSON(statusBills)
+}
+
 func CalculateCashFlowValues(cashFlows []cashflow.CashFlow) dashboard.Data {
 	result := dashboard.Data{}
 

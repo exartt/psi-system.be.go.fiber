@@ -1,11 +1,11 @@
 package person
 
 type PersonPatient struct {
-	ID       uint
-	Name     string
-	Email    string
-	isActive bool
-	isPlan   bool
+	ID       uint   `gorm:"column:id"`
+	Name     string `gorm:"column:name"`
+	Email    string `gorm:"column:email"`
+	IsActive bool   `gorm:"column:is_active"`
+	IsPlan   bool   `gorm:"column:is_plan"`
 }
 
 type DTO struct {

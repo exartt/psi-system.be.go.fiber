@@ -52,6 +52,7 @@ func RegisterRoutes(app *fiber.App) {
 	patient := app.Group("/patient/v1")
 	patientHandler := providePatient(patientService)
 	patient.Get("/list-patients", patientHandler.GetPatientsOptions)
+	patient.Get("/get-patient-option/:id", patientHandler.GetPatientOption)
 	patient.Post("/create-patient", patientHandler.CreatePatient)
 	patient.Put("/update-patient", patientHandler.UpdatePatient)
 	patient.Delete("/delete-patient/:id", patientHandler.DeactivatePatient)
@@ -64,6 +65,7 @@ func RegisterRoutes(app *fiber.App) {
 
 	dashboard := app.Group("/dashboard/v1")
 	dashboard.Get("/get-dash", dashboardHandler.GetDashboardData)
+	dashboard.Get("/get-status-bills", dashboardHandler.GetStatusBills)
 
 }
 
